@@ -1,185 +1,8 @@
 import {createStore} from 'redux';
 import $ from 'jquery';
+import {defaultState, numToLetter, letterToNum} from './drawBoard';
 
-function defaultState(){
-    var figures = [
-        {
-            name:'queen',
-            position:'d1',
-            color:'white'
-        },
-        {
-            name:'king',
-            color:'white',
-            position:'e1'
-        },
-        {
-            name:'bishop',
-            color:'white',
-            position:'f1'
-        },
-        {
-            name:'bishop',
-            color:'white',
-            position:'c1'
-        },
-        {
-            name:'knight',
-            color:'white',
-            position:'b1'
-        },
-        {
-            name:'knight',
-            color:'white',
-            position:'g1'
-        },
-        {
-            name:'rook',
-            color:'white',
-            position:'h1'
-        },
-        {
-            name:'rook',
-            color:'white',
-            position:'a1'
-        },
-        {
-            name: 'pawn',
-            color:'white',
-            position:'a2'
-        },
-        {
-            name: 'pawn',
-            color:'white',
-            position:'b2'
-        },
-        {
-            name: 'pawn',
-            color:'white',
-            position:'c2'
-        },
-        {
-            name: 'pawn',
-            color:'white',
-            position:'d2'
-        },
-        {
-            name: 'pawn',
-            color:'white',
-            position:'e2'
-        },
-        {
-            name: 'pawn',
-            color:'white',
-            position:'f2'
-        },
-        {
-            name: 'pawn',
-            color:'white',
-            position:'g2'
-        },
-        {
-            name: 'pawn',
-            color:'white',
-            position:'h2'
-        },
-        {
-            name:'queen',
-            color:'black',
-            position:'d8'
-        },
-        {
-            name:'king',
-            color:'black',
-            position:'e8'
-        },
-        {
-            name:'bishop',
-            color:'black',
-            position:'f8'
-        },
-        {
-            name:'bishop',
-            color:'black',
-            position:'c8'
-        },
-        {
-            name:'knight',
-            color:'black',
-            position:'b8'
-        },
-        {
-            name:'knight',
-            color:'black',
-            position:'g8'
-        },
-        {
-            name:'rook',
-            color:'black',
-            position:'h8'
-        },
-        {
-            name:'rook',
-            color:'black',
-            position:'a8'
-        },
-        {
-            name: 'pawn',
-            color:'black',
-            position:'a7'
-        },
-        {
-            name: 'pawn',
-            color:'black',
-            position:'b7'
-        },
-        {
-            name: 'pawn',
-            color:'black',
-            position:'c7'
-        },
-        {
-            name: 'pawn',
-            color:'black',
-            position:'d7'
-        },
-        {
-            name: 'pawn',
-            color:'black',
-            position:'e7'
-        },
-        {
-            name: 'pawn',
-            color:'black',
-            position:'f7'
-        },
-        {
-            name: 'pawn',
-            color:'black',
-            position:'g7'
-        },
-        {
-            name: 'pawn',
-            color:'black',
-            position:'h7'
-        }
-    ];
-    return {figures, turnOfWhite: true};
-}
 
-const numToLetter = (num) => {
-    var table = {
-        1:'a',
-        2:'b',
-        3:'c',
-        4:'d',
-        5:'e',
-        6:'f',
-        7:'g',
-        8:'h',
-    };
-    return table[num];
-};
 
 const DrawBoard = (state) => {
     $('table').empty();
@@ -211,12 +34,6 @@ const DrawBoard = (state) => {
             cell.attr('data-position', numToLetter(cellIndex) + index + '');
             row.append(cell);
         }
-        $('.cell').click(function(){
-                var figureColor = $(this).data('color');
-                var figurePosition = $(this).data('position');
-                var figureType = $(this).data('name');
-                cellClick(figureColor, figurePosition, figureType);
-        });
         $('table').append(row.clone());
     }
     var figures = state.figures; 
@@ -226,6 +43,13 @@ const DrawBoard = (state) => {
         cell.attr('data-color', figure.color);
         cell.attr('data-name', figure.name);
         $('.' + figure.position).append(figureImg);
+    });
+
+    $('.cell').click(function(){
+        var figureColor = $(this).data('color');
+        var figurePosition = $(this).data('position');
+        var figureType = $(this).data('name');
+        cellClick(figureColor, figurePosition, figureType);
     });
 };
 
@@ -252,15 +76,39 @@ const reducer = (state = defaultState(), action) => {
 let store = createStore(reducer);
 
 
+function setAvailableMoves(){
+    if (activeFigure) {
+        switch (activeFigure.type) {
+            case 'pawn':
+                var positionLetterNum = letterToNum(activeFigure.position[0]);
+                var positionNum = Number(activeFigure.position[1]);
+                var moveDirection;
+                if (activeFigure.color === 'white') {
+                    moveDirection = +1;
+                }
+                else{
+                    moveDirection = -1;
+                }
+                var moves = [[positionLetterNum, positionNum+moveDirection], [positionLetterNum+1, positionNum+moveDirection], [positionLetterNum-1, positionNum+moveDirection]];
+                activeFigure.moves = moves;
+            default:
+                break;
+        }
+    }
+}
+
 function cellClick(figureColor, position, figureType){
+    //clicked on empty
     if(!activeFigure && !figureColor){
         activeFigure = undefined;
         return;
     }
+    //selected a figure
     if (!activeFigure) {
-        activeFigure = {figureColor, position, figureType};
-        console.log(activeFigure);
+        activeFigure = {color:figureColor, position, type: figureType};
+        setAvailableMoves();
     }
+    //chose a new position
     else {
         store.dispatch({type: 'MOVE_FIGURE', position: activeFigure.position, newPosition: position});
         activeFigure = undefined;
