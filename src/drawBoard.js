@@ -163,7 +163,7 @@ function defaultState(){
             position:'h7'
         }
     ];
-    return {figures, turnOfWhite: true};
+    return figures;
 }
 
 const numToLetter = (num) => {
@@ -185,4 +185,8 @@ const letterToNum = (letter) => {
     return letters.indexOf(letter) + 1;
 };
 
-export {defaultState, numToLetter, letterToNum};
+const arrayPositionToString = (positionArray) => {
+    return numToLetter(positionArray[0]) + positionArray[1];
+};
+
+export {defaultState, numToLetter, letterToNum, arrayPositionToString};

@@ -1,18 +1,18 @@
-import {createStore} from 'redux';
+import {createStore, combineReducers} from 'redux';
 import $ from 'jquery';
-import {defaultState, numToLetter, letterToNum} from './drawBoard';
+import {defaultState, numToLetter, letterToNum, arrayPositionToString} from './drawBoard';
 
 
 
 const DrawBoard = (state) => {
     $('table').empty();
-    var templateRow = $('<tr/>');
-    var templateCell = $('<td/>');
+    let templateRow = $('<tr/>');
+    let templateCell = $('<td/>');
     templateCell.addClass('cell');
     
-    for (var index = 8; index > 0; index--) {
+    for (let index = 8; index > 0; index--) {
         let row = templateRow.clone();
-        for (var cellIndex = 1; cellIndex < 9; cellIndex++) {
+        for (let cellIndex = 1; cellIndex < 9; cellIndex++) {
             let cell = templateCell.clone();
             if (index % 2 != 0){
                 if (cellIndex % 2 === 0) {
@@ -36,35 +36,48 @@ const DrawBoard = (state) => {
         }
         $('table').append(row.clone());
     }
-    var figures = state.figures; 
+    let figures = state.figures; 
     figures.forEach((figure, index)=>{
-        var figureImg = $('<img/>').attr('src','img/' + figure.color+'-'+figure.name + '.png').addClass('figure');
-        var cell = $('.' + figure.position);
+        let figureImg = $('<img/>').attr('src','img/' + figure.color+'-'+figure.name + '.png').addClass('figure');
+        let cell = $('.' + figure.position);
         cell.attr('data-color', figure.color);
         cell.attr('data-name', figure.name);
         $('.' + figure.position).append(figureImg);
     });
 
     $('.cell').click(function(){
-        var figureColor = $(this).data('color');
-        var figurePosition = $(this).data('position');
-        var figureType = $(this).data('name');
+        let figureColor = $(this).data('color');
+        let figurePosition = $(this).data('position');
+        let figureType = $(this).data('name');
         cellClick(figureColor, figurePosition, figureType);
     });
 };
 
 
-
-const reducer = (state = defaultState(), action) => {
+const activeFigure = (state = {turn:'white'}, action) =>{
+  switch (action.type) {
+      case 'CHANGE_ACTIVE_FIGURE':
+          return {...state, color:action.color, position: action.position, type: action.figureType};
+      case 'SET_AVAILABLE_MOVES':
+          return {...state, moves: action.moves};
+      case 'CHANGE_TURN':
+          return {...state, turn: state.turn === 'white' ? 'black':'white'};
+      case 'FIGURE_UNSELECTED':
+          return {turn: state.turn};
+      default:
+          return state;
+  }  
+};
+const figures = (state = defaultState(), action) => {
     switch (action.type) {
         case 'MOVE_FIGURE':
-            var newState = Object.assign(state);
-            newState.figures.forEach((figure,index) => {
+            let newState = Object.assign(state);
+            newState.forEach((figure,index) => {
                 if(figure.position === action.position){
                     figure.position = action.newPosition;
                 }
                 else if(figure.position === action.newPosition){
-                    newState.figures.splice(index,1);
+                    newState.splice(index,1);
                 }
             });
             return newState;
@@ -73,48 +86,95 @@ const reducer = (state = defaultState(), action) => {
     }
 };
 
+const reducer = combineReducers({activeFigure, figures});
+
 let store = createStore(reducer);
+console.log(store.getState());
 
 
 function setAvailableMoves(){
-    if (activeFigure) {
-        switch (activeFigure.type) {
+    if (store.getState().activeFigure.position) {
+        switch (store.getState().activeFigure.type) {
             case 'pawn':
-                var positionLetterNum = letterToNum(activeFigure.position[0]);
-                var positionNum = Number(activeFigure.position[1]);
-                var moveDirection;
-                if (activeFigure.color === 'white') {
+                let positionletterNum = letterToNum(store.getState().activeFigure.position[0]);
+                let positionNum = Number(store.getState().activeFigure.position[1]);
+                let moveDirection;
+                if (store.getState().activeFigure.color === 'white') {
                     moveDirection = +1;
                 }
                 else{
                     moveDirection = -1;
                 }
-                var moves = [[positionLetterNum, positionNum+moveDirection], [positionLetterNum+1, positionNum+moveDirection], [positionLetterNum-1, positionNum+moveDirection]];
-                activeFigure.moves = moves;
+                let moves = [[positionletterNum, positionNum+moveDirection], [positionletterNum+1, positionNum+moveDirection], [positionletterNum-1, positionNum+moveDirection]];
+                moves = moves.map((object, index)=>{
+                    let stringPosition = arrayPositionToString(object);
+                    if (store.getState().figures.some(item => item.position === stringPosition)) {
+                        var figure = store.getState().figures.filter(element => element.position === stringPosition)[0];
+                        if (figure) {
+                            if (figure.color === store.getState().activeFigure.color || figure.position[0] === store.getState().activeFigure.position[0]) {
+                                return;
+                            }   
+                        }
+                    }
+                    else if(store.getState().activeFigure.position[0] != stringPosition[0]){
+                        return;
+                    }
+                    return stringPosition;
+                });
+                store.dispatch({type: 'SET_AVAILABLE_MOVES', moves});
+                console.log(store.getState().activeFigure.moves);
             default:
                 break;
         }
     }
 }
 
+const highlightMoves = () => {
+    store.getState().activeFigure.moves.forEach((move, index)=>{
+        $('.' + move).addClass('availableMove');
+    });
+}
+
 function cellClick(figureColor, position, figureType){
-    //clicked on empty
-    if(!activeFigure && !figureColor){
-        activeFigure = undefined;
+    //clicked on empty cell
+    if(!store.getState().activeFigure.position && !figureColor){
+        store.dispatch({type: 'FIGURE_UNSELECTED'});
         return;
     }
     //selected a figure
-    if (!activeFigure) {
-        activeFigure = {color:figureColor, position, type: figureType};
-        setAvailableMoves();
+    if (!store.getState().activeFigure.position) {
+        if (figureColor === store.getState().activeFigure.turn) {
+            store.dispatch(
+                {type: 'CHANGE_ACTIVE_FIGURE',
+                 color: figureColor,
+                 figureType,
+                 position
+            });
+            setAvailableMoves();
+            highlightMoves();
+        }
     }
     //chose a new position
     else {
-        store.dispatch({type: 'MOVE_FIGURE', position: activeFigure.position, newPosition: position});
-        activeFigure = undefined;
+        if (store.getState().activeFigure.moves.some(move => move === position)) {
+            store.dispatch({type: 'MOVE_FIGURE', position: store.getState().activeFigure.position, newPosition: position});
+            store.dispatch({type: 'CHANGE_TURN'});
+            console.log('turn of '+ store.getState().turn);
+            store.dispatch({type: 'FIGURE_UNSELECTED'});
+        }
+        else if (figureColor === store.getState().activeFigure.color) {
+            store.dispatch(
+                {type: 'CHANGE_ACTIVE_FIGURE',
+                 color: figureColor,
+                 figureType,
+                 position
+            });
+            setAvailableMoves();
+            highlightMoves();
+        }
     }
 }
 
-let activeFigure = undefined; 
 DrawBoard(store.getState());
 store.subscribe(() => {DrawBoard(store.getState())});
+store.subscribe(() => {console.log(store.getState())});
